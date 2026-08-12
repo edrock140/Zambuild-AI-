@@ -1,0 +1,25 @@
+{
+  "project_id": "gen-lang-client-0659775712",
+  "collections": [
+    {
+      "name": "users",
+      "document_id": "digitalId",
+      "fields": [
+        { "name": "nickname", "type": "string" },
+        { "name": "digitalId", "type": "string" },
+        { "name": "language", "type": "string" },
+        { "name": "startTime", "type": "number" },
+        { "name": "contactPartial", "type": "string", "optional": true },
+        { "name": "email", "type": "string", "optional": true },
+        { "name": "lastNicknameChange", "type": "number", "optional": true },
+        { "name": "score", "type": "number", "optional": true }
+      ],
+      "rules": {
+        "read": "true",
+        "create": "true",
+        "update": "true",
+        "delete": "false"
+      }
+    }
+  ]
+}

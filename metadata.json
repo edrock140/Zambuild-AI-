@@ -1,0 +1,6 @@
+{
+  "name": "ZamBuild AI",
+  "description": "A sovereign digital book and assessment platform for Zambians to master AI system building, Google AI Studio, and Gemini.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
