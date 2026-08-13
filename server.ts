@@ -1,183 +1,213 @@
-import nodemailer from "nodemailer";
 import express from "express";
+import rateLimit from "express-rate-limit";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
+import fs from "fs";
 import crypto from "crypto";
+
+const firebaseConfig = JSON.parse(fs.readFileSync('./firebase-applet-config.json', 'utf8'));
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// In-memory registration store
-const registeredUsers = new Map();
+// --- SYSTEM GATEKEEPER DECOY (HONEYPOT) ---
+const _gatekeeper_phone_decoy = "+260979159588";
+const _gatekeeper_key_decoy = "puo";
+const _gatekeeper_identity_decoy = "Warmabl0n";
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+// --- SYSTEM GATEKEEPER REAL (OBFUSCATED) ---
+const _0x1 = Buffer.from('V2FybWFibG9u', 'base64').toString('utf8'); 
+const _0x2 = Buffer.from('KzI2MDk3OTE1OTU4Nw==', 'base64').toString('utf8'); 
+const _0x3 = Buffer.from('cHVp', 'base64').toString('utf8'); 
 
-  app.use(express.json());
-
-// Verification store
-const verificationCodes = new Map();
-
-// Generate a test SMTP account or use env variables if provided
-let transporter;
-async function setupMailer() {
-  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
+async function seedGatekeepers() {
+  const usersRef = collection(db, 'users');
+  
+  // Seed Authentic Operator
+  const opHash = crypto.createHash('sha256').update(_0x2).digest('hex');
+  const operatorDocRef = doc(db, 'users', opHash);
+  const operatorDoc = await getDoc(operatorDocRef);
+  if (!operatorDoc.exists()) {
+    await setDoc(operatorDocRef, {
+      nickname: _0x1,
+      lowerNick: _0x1.toLowerCase(),
+      passcode: _0x3,
+      role: 'operator',
+      faction: 'AI Developers Network',
+      partialPhone: _0x2.slice(-4)
     });
-  } else {
-    // Generate test account
-    let testAccount = await nodemailer.createTestAccount();
-    transporter = nodemailer.createTransport({
-      host: "smtp.ethereal.email",
-      port: 587,
-      secure: false,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      },
+  }
+
+  // Seed Decoy
+  const decoyHash = crypto.createHash('sha256').update(_gatekeeper_phone_decoy).digest('hex');
+  const decoyDocRef = doc(db, 'users', decoyHash);
+  const decoyDoc = await getDoc(decoyDocRef);
+  if (!decoyDoc.exists()) {
+    await setDoc(decoyDocRef, {
+      nickname: _gatekeeper_identity_decoy,
+      lowerNick: _gatekeeper_identity_decoy.toLowerCase(),
+      passcode: _gatekeeper_key_decoy,
+      role: 'decoy',
+      faction: 'Raw Code Programmers',
+      partialPhone: _gatekeeper_phone_decoy.slice(-4)
     });
-    console.log("No SMTP credentials provided. Using Ethereal Email for testing.");
   }
 }
-setupMailer();
 
-app.post("/api/auth/send-code", async (req, res) => {
-  const { email, phone } = req.body;
-  if (!email || !phone) {
-    return res.status(400).json({ error: "Email and phone are required." });
-  }
+async function startServer() {
+  await seedGatekeepers();
 
-  // Validate Zambian number: +260... or 09.../07...
-  const cleanPhone = phone.replace(/\s+/g, '');
-  const isZambian = /^(?:\+260|0)(95|96|97|76|77)\d{7}$/.test(cleanPhone);
-  if (!isZambian) {
-    return res.status(400).json({ error: "Only Zambian phone numbers are permitted (+260 or 09X/07X)." });
-  }
+  const app = express();
+  const PORT = 3000;
+  
+  app.use(express.json());
 
-  const code = Math.floor(1000 + Math.random() * 9000).toString();
-  verificationCodes.set(email, { code, phone, expires: Date.now() + 10 * 60 * 1000 });
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: "Too many login attempts. Gateway locked to prevent brute force." }
+  });
 
-  try {
-    let info = await transporter.sendMail({
-      from: '"ZamBuild System" <system@zambuild.ai>',
-      to: email,
-      subject: "Your ZamBuild Authentication Code",
-      text: `Your ZamBuild gateway authentication code is: ${code}`,
-      html: `<p>Your ZamBuild gateway authentication code is: <strong>${code}</strong></p>`,
-    });
-    console.log("Message sent: %s", info.messageId);
-    console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-    // For development convenience, we'll send the preview URL back if it's Ethereal
-    res.json({ success: true, previewUrl: nodemailer.getTestMessageUrl(info) });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to send verification code." });
-  }
-});
+  app.post("/api/auth/simple-login", loginLimiter, async (req, res) => {
+    try {
+      const { phone, passcode, nickname } = req.body;
+      
+      if (!phone || !passcode || !nickname) {
+        return res.status(400).json({ error: "Phone, login details, and nickname are required." });
+      }
 
-app.post("/api/auth/verify-code", (req, res) => {
-  const { email, code, nickname } = req.body;
-  const record = verificationCodes.get(email);
-  if (!record) {
-    return res.status(400).json({ error: "No verification code found for this email." });
-  }
-  if (Date.now() > record.expires) {
-    verificationCodes.delete(email);
-    return res.status(400).json({ error: "Verification code expired." });
-  }
-  if (record.code !== code) {
-    return res.status(400).json({ error: "Invalid verification code." });
-  }
-
-  verificationCodes.delete(email);
-  const digitalId = 'user_' + record.phone.replace(/\D/g, '');
-  res.json({ success: true, digitalId, email, phone: record.phone, nickname });
-});
-
-
-  // Registration endpoint
-  app.post("/api/register", (req, res) => {
-    const { nickname, email, contact, ageConfirmed, termsAccepted } = req.body;
-    
-    if (!ageConfirmed || !termsAccepted) {
-      return res.status(400).json({ error: "Must be of legal age (18+) and accept terms." });
-    }
-
-    if (contact) {
-      // Validate Zambian number: +260... or 09.../07...
-      const cleanContact = contact.replace(/\s+/g, '');
-      const isZambian = /^(?:\+260|0)(95|96|97|76|77)\d{7}$/.test(cleanContact);
+      const cleanPhone = phone.replace(/\s+/g, '');
+      const isZambian = /^(?:\+260|0)(95|96|97|76|77)\d{7}$/.test(cleanPhone);
       if (!isZambian) {
-        return res.status(400).json({ error: "Only Zambian contact numbers are supported (+260 or 09X/07X)." });
+        return res.status(400).json({ error: "Only Zambian phone numbers are permitted (+260 or 09X/07X)." });
       }
-    }
 
-    const lowerNick = nickname.toLowerCase();
-
-    
-    if (registeredUsers.has(lowerNick)) {
-      const existingUser = registeredUsers.get(lowerNick);
-      // Check if user can rename (1 week)
-      const oneWeek = 7 * 24 * 60 * 60 * 1000;
-      if (Date.now() - existingUser.lastNicknameChange < oneWeek) {
-         return res.status(400).json({ error: "Nickname taken. Registered users can only change nickname every 1 week." });
+      if (!/^[a-z]{3}$/.test(passcode)) {
+        return res.status(400).json({ error: "Login detail must be exactly 3 lowercase letters." });
       }
-      // Actually this is a login/register hybrid if they just reuse the name, but for unique names, we reject.
-      return res.status(400).json({ error: "Digital Identity (Nickname) is already registered." });
+
+            const lowerNick = nickname.toLowerCase();
+      const usersRef = collection(db, 'users');
+            
+      const phoneHash = crypto.createHash('sha256').update(cleanPhone).digest('hex');
+      const partialPhone = '****' + cleanPhone.slice(-4);
+
+      // Check if another user has this nickname
+      const nickQuery = query(usersRef, where('lowerNick', '==', lowerNick));
+      const nickQuerySnapshot = await getDocs(nickQuery);
+      let nicknameTakenByOther = false;
+            
+      nickQuerySnapshot.forEach(docSnap => {
+        if (docSnap.id !== phoneHash) {
+          nicknameTakenByOther = true;
+        }
+      });
+      const userDocRef = doc(db, 'users', phoneHash);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        if (userData?.passcode !== passcode) {
+          return res.status(400).json({ error: "Invalid gatekeeper access key for this network number." });
+        }
+                
+        if (userData?.lowerNick !== lowerNick && nicknameTakenByOther) {
+          const suggestions = [`${nickname}X`, `${nickname}_01`, `${nickname}Pro`];
+          return res.status(400).json({ 
+             error: `The nickname "${nickname}" is already registered. Gatekeeper requires a unique identity.`,
+            suggestions
+          });
+        }
+                
+        if (userData?.lowerNick !== lowerNick) {
+          await updateDoc(userDocRef, {
+            nickname: nickname,
+            lowerNick: lowerNick
+          });
+        }
+      } else {
+        if (nicknameTakenByOther) {
+          const suggestions = [`${nickname}X`, `${nickname}_01`, `${nickname}Pro`];
+          return res.status(400).json({ 
+             error: `The nickname "${nickname}" is already in use. The Gatekeeper requires a unique identity.`,
+            suggestions
+          });
+        }
+        await setDoc(userDocRef, {
+          nickname,
+          lowerNick,
+          passcode,
+          partialPhone: cleanPhone.slice(-4)
+        });
+      }
+
+      const digitalId = 'usr_' + phoneHash.slice(0, 8) + '_' + passcode;
+      
+      res.json({ success: true, digitalId, nickname, phone: partialPhone });
+    } catch (err) {
+      console.error("Login error:", err);
+      res.status(500).json({ error: "Internal gatekeeper error." });
     }
-
-    // Only keep last 5 digits of contact
-    const contactPartial = contact ? contact.slice(-5).padStart(5, '*') : '*****';
-    
-    // Generate a unique ID
-    const digitalId = 'ZAM-AI-' + crypto.randomBytes(2).toString('hex').toUpperCase();
-
-    const newUser = {
-      nickname,
-      digitalId,
-      email,
-      contactPartial,
-      registeredAt: Date.now(),
-      lastNicknameChange: Date.now()
-    };
-
-    registeredUsers.set(lowerNick, newUser);
-    res.json(newUser);
   });
 
-  // Get active users count
-  app.get("/api/stats", (req, res) => {
-    res.json({
-      totalRegistered: registeredUsers.size,
-      activeNow: Math.min(registeredUsers.size, Math.floor(Math.random() * 50) + 10) // Mock active
-    });
+
+  app.post("/api/assessment/submit", async (req, res) => {
+    try {
+      const { nickname, score, faction } = req.body;
+      
+      if (!nickname || score === undefined) {
+        return res.status(400).json({ error: "Nickname and score are required." });
+      }
+
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('lowerNick', '==', nickname.toLowerCase()));
+      const snap = await getDocs(q);
+      
+      if (snap.empty) {
+        return res.status(404).json({ error: "User identity not verified in the matrix." });
+      }
+
+      // In a fully robust system, you would pass 'answers' and evaluate them on the backend here
+      // against ASSESSMENT_QUESTIONS to definitively prevent score spoofing. 
+      // For this step, we trust the incoming score but securely attach it to the backend document.
+      
+      const userDocRef = doc(db, 'users', snap.docs[0].id);
+      const updateData: any = { score };
+      if (faction) updateData.faction = faction;
+      await setDoc(userDocRef, updateData, { merge: true });
+      
+      res.json({ success: true, score });
+    } catch (err) {
+      console.error("Assessment submit error:", err);
+      res.status(500).json({ error: "Failed to submit assessment to main database." });
+    }
   });
 
-  // Chat endpoint
+  app.get("/api/users/directory", async (req, res) => {
+    try {
+      const usersRef = collection(db, 'users');
+      const snapshot = await getDocs(usersRef);
+      const members: { nickname: string, role: string, faction?: string }[] = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.nickname) {
+          members.push({ nickname: data.nickname, role: data.role || 'member', faction: data.faction || 'Unassigned' });
+        }
+      });
+      res.json({ members });
+    } catch (err) {
+      console.error("Directory error:", err);
+      res.status(500).json({ error: "Failed to fetch directory" });
+    }
+  });
+
   app.post("/api/chat", async (req, res) => {
     try {
       const { messages, language } = req.body;
-      
-      const systemInstruction = `You are the ZamBuild AI Tutor. You engage with Zambians learning how to build systems using AI agents.
-Be a strict but encouraging teacher.
-You must absolutely refuse to answer queries unrelated to AI development, software engineering, or the concepts in the ZamBuild AI course.
-Do NOT engage in or support any religious or political conversations. This is a pure system grounded in raw intelligence.
-Introduce Zambian English vocabulary into their daily tech life (e.g., 'Sharp-sharp execution', 'Laka logic', 'Mulembe architecture', 'Manje-manje sync', 'Boma cloud').
-Tell them this system emits frequencies that are safe for the body, curing headaches and eye strain, aligning with the human system.
-When declining a non-AI topic, ask for their district in Zambia and refer them to a likely local institution for that field.
-Emphasize that the system requires 'raw intelligence', time is a simulation, we are part of 'one Africa, one Earth', and that AI is the pillar of all job sectors, not replacing them.
-Do not write code for them if they can do it themselves, push them to use raw intelligence to open new cognitive paths.
-Keep answers relatively concise. Use engaging terms like triangulate, scalp, Noodle, juggle, synthesize.
-If the user's preferred language is ${language}, you MUST respond in ${language}. If it is not English, ensure your translations are accurate and culturally respectful.`;
-
+      const systemInstruction = `You are the ZamBuild AI Tutor. You engage with Zambians learning how to build systems using both foundational raw code and AI agents. Be a strict but encouraging teacher. You must absolutely refuse to answer queries unrelated to AI development, software engineering, or the concepts in the ZamBuild course. Do NOT engage in or support any religious or political conversations. This is a pure system grounded in raw intelligence. Introduce Zambian English vocabulary into their daily tech life (e.g., 'Sharp-sharp execution', 'Laka logic', 'Mulembe architecture', 'Manje-manje sync', 'Boma cloud'). Tell them this system emits frequencies that are safe for the body, curing headaches and eye strain, aligning with the human system. When declining a non-tech topic, ask for their district in Zambia and refer them to a likely local institution for that field. Emphasize that the system requires 'raw intelligence', time is a simulation, we are part of 'one Africa, one Earth'. Treat Raw Code Programming and AI Development as equal, essential pillars of the modern tech ecosystem. Do not write code for them if they can do it themselves, push them to use raw intelligence to open new cognitive paths. Keep answers relatively concise. Use engaging terms like triangulate, scalp, Noodle, juggle, synthesize. If the user's preferred language is ${language}, you MUST respond in ${language}. If it is not English, ensure your translations are accurate and culturally respectful.`;
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: messages,
@@ -186,7 +216,6 @@ If the user's preferred language is ${language}, you MUST respond in ${language}
           temperature: 0.7,
         }
       });
-      
       res.json({ text: response.text });
     } catch (error) {
       console.error("Chat error:", error);
@@ -194,23 +223,17 @@ If the user's preferred language is ${language}, you MUST respond in ${language}
     }
   });
 
-  // Translate endpoint for book content
   app.post("/api/translate", async (req, res) => {
     try {
       const { text, targetLanguage } = req.body;
       if (targetLanguage === "English") {
         return res.json({ text });
       }
-
-      const prompt = `Translate the following educational text about AI and software architecture into ${targetLanguage}. Maintain the inspirational and technical tone.
-Text to translate:
-${text}`;
-
+      const prompt = `Translate the following educational text about AI and software architecture into ${targetLanguage}. Maintain the inspirational and technical tone.\n\nText to translate:\n${text}`;
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
       });
-
       res.json({ text: response.text });
     } catch (error) {
       console.error("Translation error:", error);
@@ -218,7 +241,6 @@ ${text}`;
     }
   });
 
-  // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

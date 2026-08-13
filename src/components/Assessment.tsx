@@ -66,7 +66,16 @@ export function Assessment({ user }: { user?: UserState }) {
             `zambuild_score_${user.digitalId}`,
             finalScore.toString(),
           );
-          updateUserScore(user.digitalId, finalScore);
+          
+          const faction = finalScore > (ASSESSMENT_QUESTIONS.length / 2) 
+            ? "AI Developers Network" 
+            : "Raw Code Programmers";
+
+          fetch("/api/assessment/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nickname: user.nickname, score: finalScore, faction })
+          }).catch(err => console.error("Score submit error", err));
         }
         setChunkReviewing(false);
         window.scrollTo({ top: 0, behavior: "smooth" });

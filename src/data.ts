@@ -3,17 +3,17 @@ import { Chapter, Question } from "./types";
 export const BOOK_CHAPTERS: Chapter[] = [
   {
     id: "ch1",
-    title: "1. The Zambian Programmer Mentality",
+    title: "The Zambian Programmer Mentality",
     content: `Welcome to ZamBuild AI. You are embarking on a journey to empower your programming skills and craft the future.
 We celebrate global technology and the amazing systems built by brilliant minds worldwide. We embrace simulations, intelligent models, and international innovations as powerful tools in our arsenal.
 
-AI is the pillar of all job sectors. We fully support AI programmers who leverage LLMs and intelligent agents to architect complex systems at unprecedented speeds. Our focus is squarely on the Zambian programmer—your raw intelligence, your ability to learn, and your power to build.
+Technology is the pillar of all modern sectors. We fully support both Raw Code Programmers who craft the bedrock infrastructure of applications, and AI Programmers who leverage LLMs and intelligent agents to accelerate complex systems. Our focus is squarely on the Zambian programmer—your raw intelligence, your ability to learn, and your power to build across both paradigms.
 
 A crucial part of this journey is aligning the User Interface (UI). True mastery involves not just writing functional code, but ensuring the visual layer perfectly reflects the underlying system logic. The UI is the bridge between code and human experience. Let us align our tools, our code, and our interfaces.`,
   },
   {
     id: "ch2",
-    title: "2. The Architect's Lexicon",
+    title: "The Architect's Lexicon",
     content: `To think as an architect, you must master the lexicon of creation.
 Ideate & Noodle: To brainstorm raw concepts and explore possibilities.
 Tinker & Tweak: To make minor adjustments that propel functionality.
@@ -25,14 +25,14 @@ Polish, Craft & Ground: To refine the UI, ensure security, and anchor the system
   },
   {
     id: "ch3",
-    title: "3. Google AI Studio & Gemini Models",
+    title: "Google AI Studio & Gemini Models",
     content: `Google AI Studio, owned by DeepMind, is your gateway to harnessing artificial intelligence. The Gemini models are multimodal engines capable of processing text, code, and vision.
 
 You must learn to spend your quotas wisely daily. Optimize your prompts and minimize token usage. The true test of a sovereign system builder is achieving maximum output with minimal computational overhead.`,
   },
   {
     id: "ch4",
-    title: "4. Local Infrastructure & Global Reach",
+    title: "Local Infrastructure & Global Reach",
     content: `Building systems means grounding your technology locally while reaching globally. We leverage the best tools the world has to offer while applying them to local challenges.
 Domains: Purchase local Zambian domains (.zm) to support the Zambian technology sector.
 Hosting: Use global platforms like GitHub and Netlify for robust testing and continuous deployment.
@@ -40,15 +40,15 @@ APIs & Gateways: Build secure API connections and gateways that interface with g
   },
   {
     id: "ch5",
-    title: "5. Digital Wallets, Games, and Play Store",
+    title: "Digital Wallets, Games, and Play Store",
     content: `The future of Zambian tech lies in our hands. 
 Learn to build digital wallets for seamless transactions. 
 Develop Android applications and interactive games. 
-Upload them to the Google Play Store to showcase Zambian engineering to the world. Remember, your raw intelligence is the key. You do not need AI to do the work for you; you need AI to amplify the work you do.`,
+Upload them to the Google Play Store to showcase Zambian engineering to the world. Remember, your raw intelligence is the key. Whether you are typing every line of raw code by hand or using AI to amplify your workflow, the architectural vision is entirely yours.`,
   },
   {
     id: "ch6",
-    title: "6. Cyber Security, Rules & Regulations",
+    title: "Cyber Security, Rules & Regulations",
     content: `Security and ethics are the bedrock of great architecture. We operate on a strict privacy and regulatory model:
 Identity & Privacy: Never use your primary personal email or phone for exploratory platforms. Use throwaway aliases and private relays. There is zero user tracking on this network.
 Legal Age: This network is strictly for builders of legal age (18+) in Zambia.
@@ -58,16 +58,16 @@ Engineering Securely: Learn to encrypt your databases and secure your network ca
   },
   {
     id: "ch7",
-    title: "7. Programmer Growth & Mental Agility",
+    title: "Programmer Growth & Mental Agility",
     content: `A true programmer acknowledges the challenges of learning and actively engineers ways to improve their mental agility:
-Cognitive Enhancement: We use AI to augment our raw human problem-solving. AI will help you write code, but you must use your intelligence to guide it.
+Cognitive Enhancement: We train our minds through rigorous logical challenges. We respect the discipline of raw programming while embracing AI to augment our problem-solving—always guiding the tools, never blindly relying on them.
 Data Integration: We safely use global systems and APIs, always ensuring we handle user data responsibly and with absolute privacy.
 Cultural Expression: We maintain our unique identity by integrating Zambian tech vocabulary and expressing our culture through the applications we build.
 Algorithmic Focus: We tune out the noise. The network strictly prohibits religious and political intelligence. It remains a pure system designed solely for structural empowerment and architectural mastery.`,
   },
   {
     id: "ch8",
-    title: "8. The 101 Node Assessment & Expertise",
+    title: "The 101 Node Assessment & Expertise",
     content: `The 101-question assessment is designed to rigorously evaluate your raw intelligence and architectural mindset across AI paradigms, traditional software engineering, and national infrastructure planning. 
 
 Takers are highly encouraged to honestly assess themselves to discover their current level of expertise and identify areas for growth.

@@ -3,14 +3,12 @@ import { UserState } from "./types";
 import { DigitalBook } from "./components/DigitalBook";
 import { Assessment } from "./components/Assessment";
 import { Onboarding } from "./components/Onboarding";
-import { Dashboard } from "./components/Dashboard";
 import { Portal } from "./components/Portal";
 import { getUserFromDb, saveUserToDb } from "./lib/firebase";
 import {
   Clock,
   BookOpen,
   BrainCircuit,
-  LayoutDashboard,
   Network,
 } from "lucide-react";
 
@@ -20,8 +18,8 @@ export default function App() {
   const [user, setUser] = useState<UserState | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(SESSION_DURATION);
   const [activeTab, setActiveTab] = useState<
-    "book" | "assessment" | "dashboard" | "portal"
-  >("dashboard");
+    "book" | "assessment" | "portal"
+  >("book");
 
   // Load user from local storage on mount
   useEffect(() => {
@@ -118,17 +116,6 @@ export default function App() {
           </div>
           <nav className="flex items-center gap-1 bg-white/5 p-1 rounded-none border border-white/10">
             <button
-              onClick={() => setActiveTab("dashboard")}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-none text-xs uppercase tracking-wider font-medium transition-colors ${
-                activeTab === "dashboard"
-                  ? "bg-[#C67B58] text-black"
-                  : "text-white/40 hover:text-[#C67B58]"
-              }`}
-            >
-              <LayoutDashboard size={14} />
-              Command Center
-            </button>
-            <button
               onClick={() => setActiveTab("book")}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-none text-xs uppercase tracking-wider font-medium transition-colors ${
                 activeTab === "book"
@@ -195,7 +182,6 @@ export default function App() {
       <div className="flex-1 flex overflow-hidden">
         {/* Main Content Area */}
         <div className="flex-1 overflow-hidden relative">
-          {activeTab === "dashboard" && <Dashboard user={user} />}
           {activeTab === "book" && <DigitalBook language={user.language} />}
           {activeTab === "assessment" && <Assessment user={user} />}
           {activeTab === "portal" && <Portal />}

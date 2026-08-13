@@ -1,85 +1,147 @@
 import React, { useState } from "react";
 import { UserState } from "../types";
-import {
-  Terminal,
-  Shield,
-  ArrowRight,
-  Mail,
-  Phone,
-  KeyRound,
-} from "lucide-react";
+import { Terminal, Shield, ArrowRight, Phone, KeyRound, Delete } from "lucide-react";
 
 interface OnboardingProps {
   onComplete: (user: UserState) => void;
 }
 
 export function Onboarding({ onComplete }: OnboardingProps) {
-  const [step, setStep] = useState<"details" | "verify">("details");
   const [nickname, setNickname] = useState("");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
+  const [passcode, setPasscode] = useState("");
   const [error, setError] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [activeField, setActiveField] = useState<"nickname" | "phone" | "passcode" | null>(null);
 
-  const handleSendCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nickname.trim() || !phone.trim() || !email.trim()) return;
+  const handleKeyPress = (key: string) => {
+    if (!activeField) return;
 
-    // Local naive check before sending
-    const cleanPhone = phone.replace(/\s+/g, "");
-    if (!/^(?:\+260|0)(95|96|97|76|77)\d{7}$/.test(cleanPhone)) {
-      setError("Only Zambian phone numbers are permitted (+260 or 09X/07X).");
+    if (key === "BACKSPACE") {
+      if (activeField === "nickname") setNickname((prev) => prev.slice(0, -1));
+      if (activeField === "phone") setPhone((prev) => prev.slice(0, -1));
+      if (activeField === "passcode") setPasscode((prev) => prev.slice(0, -1));
       return;
     }
 
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/auth/send-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, phone }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to send code.");
-
-      if (data.previewUrl) {
-        setPreviewUrl(data.previewUrl);
+    if (activeField === "nickname") {
+      setNickname((prev) => prev + (key === "SPACE" ? " " : key));
+    } else if (activeField === "phone") {
+      if (/[0-9]/.test(key) && phone.length < 9) {
+        setPhone((prev) => prev + key);
       }
-      setStep("verify");
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    } else if (activeField === "passcode") {
+      if (/[a-z]/i.test(key) && passcode.length < 3) {
+        setPasscode((prev) => prev + key.toLowerCase());
+      }
     }
   };
 
-  const handleVerifyCode = async (e: React.FormEvent) => {
+  const renderKeyboard = () => {
+    if (!activeField) return null;
+
+    let rows = [];
+    if (activeField === "phone") {
+      rows = [
+        ["1", "2", "3"],
+        ["4", "5", "6"],
+        ["7", "8", "9"],
+        ["", "0", "BACKSPACE"],
+      ];
+    } else {
+      rows = [
+        ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+        ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+        ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+        ["z", "x", "c", "v", "b", "n", "m", "BACKSPACE"],
+        ["SPACE"]
+      ];
+    }
+
+    return (
+      <div className="mt-8 p-4 bg-black/40 border border-white/10 rounded-sm">
+        <div className="flex flex-col gap-2">
+          {rows.map((row, i) => (
+            <div key={i} className={`flex justify-center gap-1 ${row.length < 10 && activeField !== 'phone' ? 'px-4' : ''}`}>
+              {row.map((key, j) => {
+                if (key === "") return <div key={j} className="w-12 h-12" />; // Spacer for numpad
+                const isAction = key === "BACKSPACE" || key === "SPACE";
+                return (
+                  <button
+                    key={j}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleKeyPress(key);
+                    }}
+                    className={`
+                      ${activeField === 'phone' ? 'w-16 h-12 text-lg' : isAction ? 'px-4 h-10 text-xs' : 'w-8 h-10 text-sm'}
+                      ${isAction && key === 'SPACE' ? 'flex-1 max-w-[200px]' : ''}
+                      flex items-center justify-center
+                      bg-white/5 border border-white/10 hover:bg-[#C67B58]/20 hover:text-[#C67B58] hover:border-[#C67B58]/50
+                      transition-all uppercase font-mono rounded-sm text-white/80 active:scale-95
+                    `}
+                  >
+                    {key === "BACKSPACE" ? <Delete size={16} /> : key}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code.trim() || code.length !== 4) {
-      setError("Please enter a valid 4-digit code.");
+    if (!nickname.trim() || !phone.trim() || !passcode.trim()) return;
+
+    const cleanPhone = phone.replace(/\s+/g, "");
+    if (!/^(95|96|97|76|77)\d{7}$/.test(cleanPhone)) {
+      setError(
+        "Please enter a valid 9-digit Zambian network number (e.g., 97XXXXXXX).",
+      );
+      setSuggestions([]);
+      return;
+    }
+
+    if (!/^[a-z]{3}$/.test(passcode)) {
+      setError(
+        "Gatekeeper key must be exactly 3 lowercase letters (e.g. 'abc').",
+      );
+      setSuggestions([]);
       return;
     }
 
     setLoading(true);
     setError("");
+    setSuggestions([]);
+
+    const fullPhone = "+260" + cleanPhone;
+
     try {
-      const res = await fetch("/api/auth/verify-code", {
+      const res = await fetch("/api/auth/simple-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code, nickname }),
+        body: JSON.stringify({ phone: fullPhone, passcode, nickname }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to verify code.");
+
+      if (!res.ok) {
+        if (data.suggestions) {
+          setSuggestions(data.suggestions);
+        }
+        throw new Error(data.error || "Failed to authenticate.");
+      }
 
       onComplete({
-        nickname: data.nickname || nickname,
+        nickname: data.nickname,
         digitalId: data.digitalId,
         language: "English",
         startTime: Date.now(),
-        email: data.email,
+        contactPartial: data.phone,
       });
     } catch (err: any) {
       setError(err.message);
@@ -101,139 +163,119 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             ZamBuild AI
           </h1>
           <p className="text-white/50 text-sm uppercase tracking-wider">
-            System Gateway Authentication
+            Authentication
           </p>
         </div>
 
         {error && (
-          <div className="mb-6 p-3 bg-[#FF4444]/10 border border-[#FF4444]/30 text-[#FF4444] text-xs text-center">
-            {error}
+          <div className="mb-6 p-4 bg-[#FF4444]/10 border border-[#FF4444]/30 text-[#FF4444] text-xs text-center flex flex-col gap-3">
+            <p>{error}</p>
+            {suggestions.length > 0 && (
+              <div className="flex flex-col gap-2 mt-2">
+                <span className="text-[10px] uppercase tracking-widest text-white/50">
+                  Available Identifiers:
+                </span>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {suggestions.map((sug) => (
+                    <button
+                      key={sug}
+                      type="button"
+                      onClick={() => {
+                        setNickname(sug);
+                        setError("");
+                        setSuggestions([]);
+                      }}
+                      className="px-2 py-1 bg-black/40 border border-[#FF4444]/30 hover:bg-[#FF4444]/20 hover:text-white transition-colors text-[#E0E0E0]"
+                    >
+                      {sug}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {step === "details" ? (
-          <form onSubmit={handleSendCode} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest text-[#C67B58]">
-                Developer Nickname
-              </label>
-              <div className="relative">
-                <Terminal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                <input
-                  type="text"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  placeholder="e.g. CodeSmith"
-                  className="w-full bg-black/50 border border-white/10 p-3 pl-10 text-white placeholder-white/20 focus:outline-none focus:border-[#C67B58] transition-colors"
-                  required
-                />
-              </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest text-[#C67B58]">
+              Nickname
+            </label>
+            <div className={`relative border transition-colors ${activeField === 'nickname' ? 'border-[#C67B58]' : 'border-white/10'}`}>
+              <Terminal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+              <input
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                onFocus={() => setActiveField('nickname')}
+                inputMode="none"
+                placeholder="e.g. Warmablon"
+                className="w-full bg-black/50 p-3 pl-10 text-white placeholder-white/20 focus:outline-none transition-colors"
+                required
+              />
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest text-[#C67B58]">
-                Zambian Phone Number
-              </label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="097XXXXXXX"
-                  className="w-full bg-black/50 border border-white/10 p-3 pl-10 text-white placeholder-white/20 focus:outline-none focus:border-[#C67B58] transition-colors"
-                  required
-                />
-              </div>
-              <p className="text-[10px] text-white/30 italic">
-                Only valid +260 or 09X/07X prefixes are accepted.
-              </p>
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest text-[#C67B58]">
+              Phone Number
+            </label>
+            <div className={`flex bg-black/50 border transition-colors relative ${activeField === 'phone' ? 'border-[#C67B58]' : 'border-white/10'}`}>
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+              <span className="py-3 pl-10 pr-3 text-white/60 border-r border-white/10 bg-white/5">
+                +260
+              </span>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                onFocus={() => setActiveField('phone')}
+                inputMode="none"
+                placeholder="97XXXXXXX"
+                className="w-full bg-transparent p-3 text-white placeholder-white/20 focus:outline-none"
+                required
+              />
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest text-[#C67B58]">
-                Receiving Email Address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="developer@example.com"
-                  className="w-full bg-black/50 border border-white/10 p-3 pl-10 text-white placeholder-white/20 focus:outline-none focus:border-[#C67B58] transition-colors"
-                  required
-                />
-              </div>
-              <p className="text-[10px] text-white/30 italic">
-                A 4-digit verification code will be sent here.
-              </p>
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest text-[#C67B58]">
+              Access Key (3 Letters)
+            </label>
+            <div className={`relative border transition-colors ${activeField === 'passcode' ? 'border-[#C67B58]' : 'border-white/10'}`}>
+              <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+              <input
+                type="text"
+                maxLength={3}
+                value={passcode}
+                onChange={(e) =>
+                  setPasscode(
+                    e.target.value.toLowerCase().replace(/[^a-z]/g, ""),
+                  )
+                }
+                onFocus={() => setActiveField('passcode')}
+                inputMode="none"
+                placeholder="abc"
+                className="w-full bg-black/50 p-3 pl-10 text-white placeholder-white/20 focus:outline-none transition-colors text-center text-xl tracking-[1em]"
+                required
+              />
             </div>
+            <p className="text-[10px] text-white/30 italic text-center mt-3 leading-relaxed">
+              Choose your 3-letter signature for secure access.
+            </p>
+          </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-8 flex items-center justify-center gap-3 p-4 border border-[#C67B58] text-[#C67B58] hover:bg-[#C67B58] hover:text-black transition-colors uppercase tracking-widest text-xs font-bold disabled:opacity-50"
-            >
-              {loading ? "Initializing..." : "Request Access Code"}
-              <ArrowRight size={16} />
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyCode} className="space-y-6">
-            <div className="p-4 bg-white/5 border border-white/10 text-center mb-6">
-              <p className="text-sm text-white/70 mb-2">
-                Authentication code dispatched to:
-              </p>
-              <p className="text-[#C67B58] font-mono">{email}</p>
-            </div>
+          {renderKeyboard()}
 
-            <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest text-[#C67B58]">
-                4-Digit Gateway Code
-              </label>
-              <div className="relative">
-                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                <input
-                  type="text"
-                  maxLength={4}
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                  placeholder="0000"
-                  className="w-full bg-black/50 border border-white/10 p-3 pl-10 text-white placeholder-white/20 focus:outline-none focus:border-[#C67B58] transition-colors text-center text-xl tracking-[0.5em]"
-                  required
-                />
-              </div>
-            </div>
-
-            {previewUrl && (
-              <a
-                href={previewUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="block text-center text-xs text-[#C67B58] underline mt-2"
-              >
-                (Dev Mode: Click to view email code)
-              </a>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading || code.length !== 4}
-              className="w-full mt-8 flex items-center justify-center gap-3 p-4 bg-[#C67B58] text-black hover:bg-[#D98A66] transition-colors uppercase tracking-widest text-xs font-bold disabled:opacity-50"
-            >
-              {loading ? "Verifying..." : "Confirm & Enter Network"}
-              <Shield size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep("details")}
-              className="w-full flex items-center justify-center p-2 text-white/40 hover:text-white transition-colors text-[10px] uppercase tracking-widest"
-            >
-              Modify Details
-            </button>
-          </form>
-        )}
+          <button
+            type="submit"
+            disabled={loading || passcode.length !== 3}
+            className="w-full mt-8 flex items-center justify-center gap-3 p-4 bg-gradient-to-r from-[#C67B58] to-[#E89E7A] text-black hover:from-[#D98A66] hover:to-[#FBC3AA] shadow-[0_0_20px_rgba(198,123,88,0.3)] hover:shadow-[0_0_30px_rgba(198,123,88,0.5)] transition-all duration-300 uppercase tracking-widest text-xs font-bold disabled:opacity-50 disabled:shadow-none rounded-sm"
+          >
+            {loading ? "Authenticating..." : "Connect"}
+            <ArrowRight size={16} />
+          </button>
+        </form>
       </div>
     </div>
   );
